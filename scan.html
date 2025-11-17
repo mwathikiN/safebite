@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SafeBite — Food Scan</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gray-900 text-white min-h-screen p-4">
+
+  <!-- Header -->
+  <h1 class="text-3xl font-bold text-center mb-6 tracking-wide">
+    SafeBite Food Scanner
+  </h1>
+
+  <!-- Profile Card -->
+  <div id="profileCard" class="bg-gray-800 p-6 rounded-2xl shadow-xl max-w-lg mx-auto mb-6 border border-gray-700">
+    <h2 class="text-xl font-bold mb-4 text-blue-400">Your Health Profile</h2>
+
+    <label class="block mb-3">
+      <span class="text-gray-300">Name</span>
+      <input id="name" class="mt-1 w-full p-3 rounded-xl bg-gray-700 focus:ring-2 focus:ring-blue-400" />
+    </label>
+
+    <label class="block mb-3">
+      <span class="text-gray-300">Allergies (comma separated)</span>
+      <input id="allergies" class="mt-1 w-full p-3 rounded-xl bg-gray-700 focus:ring-2 focus:ring-blue-400" />
+    </label>
+
+    <label class="block mb-3">
+      <span class="text-gray-300">Preferred Foods</span>
+      <input id="preferredFoods" class="mt-1 w-full p-3 rounded-xl bg-gray-700 focus:ring-2 focus:ring-blue-400" />
+    </label>
+
+    <label class="block mb-3">
+      <span class="text-gray-300">Diet Type</span>
+      <input id="dietType" class="mt-1 w-full p-3 rounded-xl bg-gray-700 focus:ring-2 focus:ring-blue-400" />
+    </label>
+
+    <label class="block mb-6">
+      <span class="text-gray-300">Health Conditions</span>
+      <input id="healthConditions" class="mt-1 w-full p-3 rounded-xl bg-gray-700 focus:ring-2 focus:ring-blue-400" />
+    </label>
+
+    <button id="saveProfileBtn"
+      class="w-full bg-blue-600 hover:bg-blue-700 p-3 rounded-xl text-white font-semibold transition">
+      Save Profile
+    </button>
+
+    <p class="text-sm text-gray-400 mt-3 text-center">
+      We’ll use this info to personalize your food scan. Filled once only.
+    </p>
+  </div>
+
+  <!-- File Upload Section -->
+  <div id="uploadSection" class="hidden bg-gray-800 p-6 rounded-2xl shadow-xl max-w-lg mx-auto border border-gray-700">
+    <h2 class="text-xl font-bold mb-4 text-green-400">Scan Your Meal</h2>
+
+    <input type="file" id="imageInput" accept="image/*" class="hidden" />
+    <button id="uploadBtn"
+      class="w-full bg-green-600 hover:bg-green-700 p-3 rounded-xl font-semibold transition mb-3">
+      Upload Photo
+    </button>
+
+    <p class="text-gray-400 text-sm">
+      Snap or upload a clear photo of your meal for instant AI analysis.
+    </p>
+  </div>
+
+  <!-- Results -->
+  <div id="resultsCard"
+    class="hidden bg-gray-800 p-6 rounded-2xl shadow-xl max-w-lg mx-auto mt-6 border border-gray-700">
+    <h2 class="text-xl font-bold mb-4 text-yellow-400">Scan Results</h2>
+    <div id="resultsContent" class="space-y-2 text-gray-300"></div>
+  </div>
+
+  <script>
+    const saveProfileBtn = document.getElementById("saveProfileBtn");
+    const uploadSection = document.getElementById("uploadSection");
+    const imageInput = document.getElementById("imageInput");
+    const uploadBtn = document.getElementById("uploadBtn");
+    const resultsCard = document.getElementById("resultsCard");
+    const resultsContent = document.getElementById("resultsContent");
+
+    let profileId = null;
+
+    // Save Profile
+    saveProfileBtn.addEventListener("click", async () => {
+      const profileData = {
+        name: document.getElementById("name").value,
+        allergicFoods: document.getElementById("allergies").value
+          .split(",").map(s => s.trim()).filter(Boolean),
+        preferredFoods: document.getElementById("preferredFoods").value
+          .split(",").map(s => s.trim()).filter(Boolean),
+        dietType: document.getElementById("dietType").value,
+        healthConditions: document.getElementById("healthConditions").value
+          .split(",").map(s => s.trim()).filter(Boolean),
+      };
+
+      try {
+        const res = await fetch("http://localhost:3000/api/profile", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(profileData),
+        });
+
+        const data = await res.json();
+        profileId = data.profileId;
+
+        document.getElementById("profileCard").classList.add("hidden");
+        uploadSection.classList.remove("hidden");
+      } catch (err) {
+        alert("Failed to save profile. Try again.");
+        console.error(err);
+      }
+    });
+
+    // Upload Button -> Trigger file input
+    uploadBtn.addEventListener("click", () => imageInput.click());
+
+    // Handle image upload
+    imageInput.addEventListener("change", async () => {
+      const file = imageInput.files[0];
+      if (!file) return;
+
+      const formData = new FormData();
+      formData.append("image", file);
+      formData.append("userId", profileId);
+
+      try {
+        const res = await fetch("http://localhost:3000/api/scan", {
+          method: "POST",
+          body: formData,
+        });
+
+        const result = await res.json();
+        const aiResult = result.aiResult || {};
+
+        resultsContent.innerHTML = `
+          <p><strong class="text-white">Detected Foods & Ingredients:</strong> ${aiResult.raw || "N/A"}</p>
+          <p><strong class="text-white">Friendly Advice:</strong> ${aiResult.friendlyAdvice || "N/A"}</p>
+          <p><strong class="text-white">Rating:</strong> ${aiResult.dietCompatibility || "N/A"}</p>
+          <img src="${result.imageUrl || ''}" alt="Meal Image" class="mt-3 rounded-xl" />
+        `;
+
+        resultsCard.classList.remove("hidden");
+      } catch (err) {
+        alert("Failed to scan image. Try again.");
+        console.error(err);
+      }
+    });
+  </script>
+
+</body>
+</html>
