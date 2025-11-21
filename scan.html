@@ -76,6 +76,8 @@
   </div>
 
   <script>
+    const BACKEND_URL = "https://safebite-backend-471218709027.us-central1.run.app";
+
     const saveProfileBtn = document.getElementById("saveProfileBtn");
     const uploadSection = document.getElementById("uploadSection");
     const imageInput = document.getElementById("imageInput");
@@ -99,7 +101,7 @@
       };
 
       try {
-        const res = await fetch("http://localhost:3000/api/profile", {
+        const res = await fetch(`${BACKEND_URL}/api/profile`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(profileData),
@@ -121,36 +123,52 @@
 
     // Handle image upload
     imageInput.addEventListener("change", async () => {
-      const file = imageInput.files[0];
-      if (!file) return;
+  const file = imageInput.files[0];
+  if (!file) return;
 
-      const formData = new FormData();
-      formData.append("image", file);
-      formData.append("userId", profileId);
+  const formData = new FormData();
+  formData.append("image", file);
+  formData.append("userId", profileId);
 
-      try {
-        const res = await fetch("http://localhost:3000/api/scan", {
-          method: "POST",
-          body: formData,
-        });
-
-        const result = await res.json();
-        const aiResult = result.aiResult || {};
-
-        resultsContent.innerHTML = `
-          <p><strong class="text-white">Detected Foods & Ingredients:</strong> ${aiResult.raw || "N/A"}</p>
-          <p><strong class="text-white">Friendly Advice:</strong> ${aiResult.friendlyAdvice || "N/A"}</p>
-          <p><strong class="text-white">Rating:</strong> ${aiResult.dietCompatibility || "N/A"}</p>
-          <img src="${result.imageUrl || ''}" alt="Meal Image" class="mt-3 rounded-xl" />
-        `;
-
-        resultsCard.classList.remove("hidden");
-      } catch (err) {
-        alert("Failed to scan image. Try again.");
-        console.error(err);
-      }
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/scan`, {
+      method: "POST",
+      body: formData,
     });
-  </script>
+
+    const result = await res.json();
+
+    // ---- LOG FULL BACKEND RESPONSE ----
+    console.log("Full backend response:", result);
+
+    // Check if backend returned an error
+    if (result.error) {
+      resultsContent.innerHTML = `
+        <p class="text-red-400 font-bold">Error analyzing image:</p>
+        <pre class="text-gray-300">${result.message || JSON.stringify(result)}</pre>
+      `;
+    } else {
+      const aiResult = result.aiResult || {};
+      resultsContent.innerHTML = `
+        <p><strong class="text-white">Detected Foods & Ingredients:</strong> ${aiResult.raw || "N/A"}</p>
+        <p><strong class="text-white">Friendly Advice:</strong> ${aiResult.friendlyAdvice || "N/A"}</p>
+        <p><strong class="text-white">Rating:</strong> ${aiResult.dietCompatibility || "N/A"}</p>
+        <img src="${result.imageUrl || ''}" alt="Meal Image" class="mt-3 rounded-xl" />
+      `;
+    }
+
+    resultsCard.classList.remove("hidden");
+
+  } catch (err) {
+    resultsContent.innerHTML = `
+      <p class="text-red-400 font-bold">Network or unexpected error:</p>
+      <pre class="text-gray-300">${err.message}</pre>
+    `;
+    resultsCard.classList.remove("hidden");
+    console.error("Fetch error:", err);
+  }
+});
+</script>
 
 </body>
 </html>
